@@ -35,8 +35,8 @@ gamma = 1; % [-] surface tension coefficient
 T = 14208*psi_n*G; % [-] dimensionless time in the experiment
 
 %------------------------- Numerical parameters ---------------------------
-nR = 201; j = (3:nR-2)'; jd = (2:nR-1)';
-nZ = 101;
+nR = 401; j = (3:nR-2)'; jd = (2:nR-1)';
+nZ = 51;
 nTimes = 10001;
 r = linspace(0, R_dim, nR)'; dr = r(2) - r(1);
 R = repmat(r, 1, nZ); 
@@ -56,7 +56,9 @@ dlmwrite('R_mat.csv', reshape(R, nR*nZ,1));
 dlmwrite('Zeta_mat.csv', reshape(Zeta, nR*nZ,1));
 
 %-------------------------- Initial conditons -----------------------------
-H = precursor + (H0-precursor)*(ones(size(r)) - r.^2).*(r < 1);  % [-] initial biofilm height
+H = precursor + (H0-precursor)*(ones(size(r)) - (r/1).^2).*(r < 1);  % [-] initial biofilm height (parabolic)
+% H = (precursor + (H0-precursor)*(1 - (r/1.5).^2).^4).*(r < 1.5) + precursor*(r >= 1.5); % [-] initial biofilm height (Ward/King)
+% H = H0*exp(-r.^2/(0.5^2)); % [-] initial biofilm height (Gaussian)
 Vol_Frac = 1*ones(nR, nZ); % [-] initial cell volume fraction
 volume_fraction = reshape(Vol_Frac, nR*nZ, 1);
 Gs = ones(nR, 1); % [-] initial substratum nutrient concentration within the biofilm
@@ -107,13 +109,12 @@ for i = 1:nTimes-1
     Ah = matrix_h(j, r, nR, dt, dr, gamma, h); bh = rhs_h(j, r, nR, precursor, J, dt, dr, gamma, h);
     H = Ah\bh;
     % 2. Cell volume fraction
-    % Construct matrices
-    H_mat = repmat(h, 1, nZ);
+%     % Construct matrices
+%     H_mat = repmat(H, 1, nZ);
     h_mat = repmat(h, 1, nZ);
-%     bar_phi_mat = repmat(bar_phi, 1, nZ);
+    gb_mat = repmat(gb, 1, nZ);
+    bar_phi_mat = repmat(bar_phi, 1, nZ);
     theta_mat = repmat(Surface_Tension, 1, nZ);
-    % Compute dHdt
-    dHdt = (H_mat - h_mat)/dt;
     % Compute dUdZ
     dUdZ = nan(nR, nZ);
     dUdZ(:,1) = (-3*uz(:,1) + 4*uz(:,2) - uz(:,3))/(2*dzeta);
@@ -124,11 +125,13 @@ for i = 1:nTimes-1
     dHdX(1,:) = 0;
     dHdX(jXi,:) = (h_mat(jXi+1,:)- h_mat(jXi-1,:))./(2*dxi);
     dHdX(nR,:) = (3*h_mat(nR,:) - 4*h_mat(nR-1,:) + h_mat(nR-2,:))./(2*dxi);
-%     % Compute d/dR(RH^3T)/R
-%     ddR = nan(nR, nZ);
-%     ddR(1,:) = 2*h_mat(1,:).^3.*(-3*theta_mat(1,:) + 4*theta_mat(2,:) - theta_mat(3,:))/(2*dxi); % Replace with L'Hop
-%     ddR(jXi,:) = (Xi(jXi+1,:).*h_mat(jXi+1,:).^3.*theta_mat(jXi+1,:) - Xi(jXi-1,:).*h_mat(jXi-1,:).^3.*theta_mat(jXi-1,:))./(2*dxi*Xi(jXi,:));
-%     ddR(nR,:) = (3*h_mat(nR,:) - 4*h_mat(nR-1,:) + h_mat(nR-2,:))./(2*dxi*Xi(nR,:));
+    % Compute d/dR(RH^3T)/R
+    ddR = nan(nR, nZ);
+    ddR(1,:) = 2*h_mat(1,:).^3.*(-3*theta_mat(1,:) + 4*theta_mat(2,:) - theta_mat(3,:))/(2*dxi); % Replace with L'Hop
+    ddR(jXi,:) = (Xi(jXi+1,:).*h_mat(jXi+1,:).^3.*theta_mat(jXi+1,:) - Xi(jXi-1,:).*h_mat(jXi-1,:).^3.*theta_mat(jXi-1,:))./(2*dxi*Xi(jXi,:));
+    ddR(nR,:) = (3*h_mat(nR,:) - 4*h_mat(nR-1,:) + h_mat(nR-2,:))./(2*dxi*Xi(nR,:));
+    % Compute dHdt
+    dHdt = (1+Psi_m)*bar_phi_mat.*gb_mat.*h_mat - gamma/3*ddR;
     % Compute advection coefficients
     a1 = -gamma*Zeta.*(Zeta/2 - ones(nR, nZ));
     a2 = uz./h_mat - Zeta./h_mat.*dHdt + gamma*Zeta.^2.*(Zeta/2 - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
