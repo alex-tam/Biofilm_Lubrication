@@ -8,7 +8,7 @@ r = importdata('r.csv');
 R_dim = importdata('dish_size.csv');
 t = importdata('t.csv');
 threshold = importdata('threshold.csv');
-times = 1:1000:10001;
+times = 1:2000:20001;
 
 %------------------------- Plot solution profiles -------------------------
 for plots = 1:length(times)

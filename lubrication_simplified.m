@@ -36,8 +36,8 @@ gamma = 1; % [-] surface tension coefficient
 T = 14208*psi_n*G; % [-] dimensionless time in the experiment
 
 %------------------------- Numerical parameters ---------------------------
-nPoints = 501; j = (3:nPoints-2)'; jd = (2:nPoints-1)';
-nTimes = 10001;
+nPoints = 1001; j = (3:nPoints-2)'; jd = (2:nPoints-1)';
+nTimes = 20001;
 r = linspace(0, R, nPoints)'; dr = r(2) - r(1);
 t = linspace(0, T, nTimes); dt = t(2) - t(1);
 output_files = 10; % number of files to output
@@ -67,10 +67,10 @@ for i = 1:nTimes-1
     Ags = matrix_gs(jd, r, dr, dt, D, Qs, nPoints); bgs = rhs_gs(jd, r, dr, dt, D, Qs, nPoints, gs, gb);
     Gs = Ags\bgs;
     % Compute surface tension term: expanded form, sequential differentiation (2nd order)
-    h_x = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nPoints) - h(1:nPoints-2))/(2*dr) ; (3*h(nPoints) - 4*h(nPoints-1) + h(nPoints-2))/(2*dr) ];
-    h_xx = [ (-3*h_x(1) + 4*h_x(2) - h_x(3))/(2*dr) ; (h_x(3:nPoints) - h_x(1:nPoints-2))/(2*dr); (3*h_x(nPoints) - 4*h_x(nPoints-1) + h_x(nPoints-2))/(2*dr) ];
-    h_xxx = [ (-3*h_xx(1) + 4*h_xx(2) - h_xx(3))/(2*dr) ; (h_xx(3:nPoints) - h_xx(1:nPoints-2))/(2*dr); (3*h_xx(nPoints) - 4*h_xx(nPoints-1) + h_xx(nPoints-2))/(2*dr) ];
-    theta = h.^3.*(h_xxx + h_xx./r - h_x./(r.^2));
+    h_r = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nPoints) - h(1:nPoints-2))/(2*dr) ; (3*h(nPoints) - 4*h(nPoints-1) + h(nPoints-2))/(2*dr) ];
+    h_rr = [ (-3*h_r(1) + 4*h_r(2) - h_r(3))/(2*dr) ; (h_r(3:nPoints) - h_r(1:nPoints-2))/(2*dr); (3*h_r(nPoints) - 4*h_r(nPoints-1) + h_r(nPoints-2))/(2*dr) ];
+    h_rrr = [ (-3*h_rr(1) + 4*h_rr(2) - h_rr(3))/(2*dr) ; (h_rr(3:nPoints) - h_rr(1:nPoints-2))/(2*dr); (3*h_rr(nPoints) - 4*h_rr(nPoints-1) + h_rr(nPoints-2))/(2*dr) ];
+    theta = h.^3.*(h_rrr + h_rr./r - h_r./(r.^2));
     theta(1) = 0; % enforced by velocity condition
     % 3. Nutrient concentration (biofilm)
     Agb = matrix_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta); bgb = rhs_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs);

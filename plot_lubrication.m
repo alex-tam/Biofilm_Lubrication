@@ -21,7 +21,7 @@ for plots = 1:length(times)
     gs = importdata(['substratum_nutrient-',num2str(time_step),'.csv']);
     bar_phi = importdata(['depth-averaged_vol_frac-',num2str(time_step),'.csv']);
     u_z = importdata(['u_z-',num2str(time_step),'.csv']); Uz = reshape(u_z, nR, nZ); 
-    phi = importdata(['vol_frac-',num2str(time_step),'.csv']); Vol_Frac = reshape(phi, nR, nZ);  
+    vol_frac = importdata(['vol_frac-',num2str(time_step),'.csv']); Vol_Frac = reshape(vol_frac, nR, nZ);  
     Z = Zeta.*repmat(h, 1, nZ);
     % Plot variable profiles
     hold on
@@ -34,7 +34,7 @@ for plots = 1:length(times)
     xlabel('\(r\)', 'Interpreter', 'latex')
     ylabel('Numerical solution', 'Interpreter', 'latex')
     title(['t = ', num2str(t(times(plots))),'.'], 'Interpreter', 'latex')
-    xlim([0, R_dim]); ylim([0 2]);
+    xlim([0, R_dim]); ylim([0 5]);
     print(gcf, '-depsc', ['radial_lub_sol-',num2str(time_step),'.eps'])
     figure
     surf(R, Z, Uz,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar
@@ -68,9 +68,21 @@ theta = (h_rrr + h_rr./r - h_r./(r.^2)); theta(1) = 0; % surface tension term
 theta(1) = 0;
 theta_r = [ (-3*theta(1) + 4*theta(2) - theta(3))/(2*dr) ; (theta(3:nR) - theta(1:nR-2))/(2*dr) ; (3*theta(nR) - 4*theta(nR-1) + theta(nR-2))/(2*dr) ];
 set(gca, 'FontSize', 16) % change axis tick font size
-plot(r, h.^2.*theta); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(h\Theta\)', 'Interpreter', 'latex'); figure
+plot(r, h.*theta); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(h\Theta\)', 'Interpreter', 'latex'); figure
 plot(r, theta_r); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(\Theta_r\)', 'Interpreter', 'latex'); figure
 
+% jd = (2:nR-1)';
+% Integral_uz = nan(nR,nZ);
+%     for row = 1:nR
+%         Integral_uz(row, :) = cumtrapz(Z(row,:), Vol_Frac(row,:));
+%     end
+%     theta_uz = Z.^2/2.*(Z/3 - repmat(h, 1, nZ)).*repmat(theta, 1, nZ);
+%     derivative_uz = nan(nR, nZ);
+%     derivative_uz(1,:) = (-3*theta_uz(1,:) + 4*theta_uz(2,:) - theta_uz(3,:))/dr;
+%     derivative_uz(jd,:) = (R(jd+1,:).*theta_uz(jd+1,:) - R(jd-1,:).*theta_uz(jd-1,:))./(2*R(jd,:)*dr);
+%     derivative_uz(nR,:) = (3*theta_uz(nR,:) - 4*theta_uz(nR-1,:) + theta_uz(nR-2,:))./(2*R(nR,:)*dr);
+%     surf(R, Z, theta_uz,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; figure
+%     surf(R, Z, derivative_uz,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; figure
 %----------------------- Check boundary conditions ------------------------
 dr = r(2) - r(1); dz = Zeta(1,2) - Zeta(1,1); z = Zeta(1,:);
 ddR = (-3*Vol_Frac(1,:) + 4*Vol_Frac(2,:) - Vol_Frac(3,:))/(2*dr);
