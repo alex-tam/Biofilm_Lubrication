@@ -54,19 +54,23 @@ end
 
 %-------------------------- Plot surface tension --------------------------
 nPoints = length(r); nR = nPoints; dr = r(2) - r(1);
-nB = find(h < 1.1e-4, 1)-1;
-h_r = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nPoints) - h(1:nPoints-2))/(2*dr) ; (3*h(nPoints) - 4*h(nPoints-1) + h(nPoints-2))/(2*dr) ];
-h_rr = [ (-3*h_r(1) + 4*h_r(2) - h_r(3))/(2*dr) ; (h_r(3:nPoints) - h_r(1:nPoints-2))/(2*dr); (3*h_r(nPoints) - 4*h_r(nPoints-1) + h_r(nPoints-2))/(2*dr) ];
-h_rrr = [ (-3*h_rr(1) + 4*h_rr(2) - h_rr(3))/(2*dr) ; (h_rr(3:nPoints) - h_rr(1:nPoints-2))/(2*dr); (3*h_rr(nPoints) - 4*h_rr(nPoints-1) + h_rr(nPoints-2))/(2*dr) ];
-theta = (h_rrr + h_rr./r - h_r./(r.^2)); theta(1) = 0; % surface tension term
-% h_r = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nB) - h(1:nB-2))/(2*dr) ; (3*h(nB) - 4*h(nB-1) + h(nB-2))/(2*dr) ];
-% h_rr = [ (-3*h_r(1) + 4*h_r(2) - h_r(3))/(2*dr) ; (h_r(3:nB) - h_r(1:nB-2))/(2*dr) ; (3*h_r(nB) - 4*h_r(nB-1) + h_r(nB-2))/(2*dr) ];
-% h_rrr = [ (-3*h_rr(1) + 4*h_rr(2) - h_rr(3))/(2*dr) ; (h_rr(3:nB) - h_rr(1:nB-2))/(2*dr) ; (3*h_rr(nB) - 4*h_rr(nB-1) + h_rr(nB-2))/(2*dr) ];
-% theta = nan(nR, 1);
-% theta(1:nB) = h_rrr + h_rr./r(1:nB) - h_r./(r(1:nB).^2);
-% theta(nB+1:nR) = 0;
+% h_r = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nPoints) - h(1:nPoints-2))/(2*dr) ; (3*h(nPoints) - 4*h(nPoints-1) + h(nPoints-2))/(2*dr) ];
+% h_rr = [ (-3*h_r(1) + 4*h_r(2) - h_r(3))/(2*dr) ; (h_r(3:nPoints) - h_r(1:nPoints-2))/(2*dr); (3*h_r(nPoints) - 4*h_r(nPoints-1) + h_r(nPoints-2))/(2*dr) ];
+% h_rrr = [ (-3*h_rr(1) + 4*h_rr(2) - h_rr(3))/(2*dr) ; (h_rr(3:nPoints) - h_rr(1:nPoints-2))/(2*dr); (3*h_rr(nPoints) - 4*h_rr(nPoints-1) + h_rr(nPoints-2))/(2*dr) ];
+% theta = (h_rrr + h_rr./r - h_r./(r.^2)); theta(1) = 0; % surface tension term
+% theta(1) = 0;
+
+H = h;
+theta = nan(nR,1);
 theta(1) = 0;
+theta(2) = (r(3)*(H(4) - H(2)) - r(2)*(H(3) - H(1)))/(dr^3*(r(3)+r(2))) - r(2)*(H(3) - H(1))/(r(2)*dr^3);
+theta(3:nR-2) = ((r(5:nR) + r(4:nR-1)).*(H(5:nR) - H(4:nR-1)) - (r(4:nR-1) + r(3:nR-2)).*(H(4:nR-1) - H(3:nR-2)))./(4*r(4:nR-1)*dr^3) ...
+    - ((r(3:nR-2) + r(2:nR-3)).*(H(3:nR-2) - H(2:nR-3)) - (r(2:nR-3) + r(1:nR-4)).*(H(2:nR-3) - H(1:nR-4)))./(4*r(2:nR-3)*dr^3);
+theta(nR-1) = (r(nR)*(3*H(nR) - 4*H(nR-1) + H(nR-2)) - r(nR-1)*(H(nR) - H(nR-2)))/(dr^3*(r(nR) + r(nR-1)))...
+    + (r(nR-2)*(H(nR-1) - H(nR-3)) - r(nR-1)*(H(nR) - H(nR-2)))/(dr^3*(r(nR-1) + r(nR-2)));
+theta(nR) = 0;
 theta_r = [ (-3*theta(1) + 4*theta(2) - theta(3))/(2*dr) ; (theta(3:nR) - theta(1:nR-2))/(2*dr) ; (3*theta(nR) - 4*theta(nR-1) + theta(nR-2))/(2*dr) ];
+
 set(gca, 'FontSize', 16) % change axis tick font size
 plot(r, h.*theta); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(h\Theta\)', 'Interpreter', 'latex'); figure
 plot(r, theta_r); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(\Theta_r\)', 'Interpreter', 'latex'); figure
