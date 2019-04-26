@@ -11,7 +11,6 @@ H0 = 0.1; % [-] maximum initial biofilm height
 phi = 0.9; % [-] cell volume fraction
 precursor = 1e-4; % [-] precursor film height
 threshold = 1.1*precursor; % [-] source term threshold
-dlmwrite('threshold.csv', threshold);
 
 %------------------------ Dimensional parameters --------------------------
 R_b = 2.875; % [mm] Initial biofilm size
@@ -37,7 +36,7 @@ T = 14208*psi_n*G; % [-] dimensionless time in the experiment
 
 %------------------------- Numerical parameters ---------------------------
 nPoints = 1001; j = (3:nPoints-2)'; jd = (2:nPoints-1)';
-nTimes = 20001;
+nTimes = 100001;
 r = linspace(0, R, nPoints)'; dr = r(2) - r(1);
 t = linspace(0, T, nTimes); dt = t(2) - t(1);
 output_files = 10; % number of files to output
@@ -49,6 +48,8 @@ dlmwrite('t.csv', t, 'precision', 20);
 H = precursor + (H0-precursor)*(ones(size(r)) - r.^2).*(r < 1); % initial condition
 Gs = ones(nPoints, 1); % [-] initial substratum nutrient concentration within the biofilm
 Gb = 0*ones(nPoints, 1); % [-] initial biofilm nutrient concentration
+contact_line = r(find(H <= threshold, 1))*ones(nTimes,1); % [-] initial contact line position
+thickness_index = max(H)/contact_line(1)*ones(nTimes, 1); % [-] initial thickness index
 
 %------------------------------ Solve PDEs --------------------------------
 for i = 1:nTimes-1
@@ -64,7 +65,7 @@ for i = 1:nTimes-1
     Ah = matrix_h(j, r, nPoints, dt, dr, gamma, h); bh = rhs_h(j, r, nPoints, precursor, J, dt, dr, gamma, h);
     H = Ah\bh;
     % 2. Nutrient concentration (substratum)
-    Ags = matrix_gs(jd, r, dr, dt, D, Qs, nPoints); bgs = rhs_gs(jd, r, dr, dt, D, Qs, nPoints, gs, gb);
+    Ags = matrix_gs(jd, r, dr, dt, D, Qs, nPoints, h, threshold); bgs = rhs_gs(jd, r, dr, dt, D, Qs, nPoints, gs, gb, h, threshold);
     Gs = Ags\bgs;
     % Compute surface tension term: expanded form, sequential differentiation (2nd order)
     h_r = [ (-3*h(1) + 4*h(2) - h(3))/(2*dr) ; (h(3:nPoints) - h(1:nPoints-2))/(2*dr) ; (3*h(nPoints) - 4*h(nPoints-1) + h(nPoints-2))/(2*dr) ];
@@ -73,13 +74,18 @@ for i = 1:nTimes-1
     theta = h.^3.*(h_rrr + h_rr./r - h_r./(r.^2));
     theta(1) = 0; % enforced by velocity condition
     % 3. Nutrient concentration (biofilm)
-    Agb = matrix_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta); bgb = rhs_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs);
+    Agb = matrix_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, threshold); bgb = rhs_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs, threshold);
     Gb = Agb\bgb;
+    % Store contact line position
+    contact_line(i+1) = r(find(H <= threshold, 1));
+    thickness_index(i+1) = max(H)/contact_line(i+1);
 end
 
 dlmwrite(['biofilm_height-',num2str(i+1),'.csv'], H, 'precision', '%.20f');
 dlmwrite(['biofilm_nutrient-',num2str(i+1),'.csv'], Gb, 'precision', '%.20f');
 dlmwrite(['substratum_nutrient-',num2str(i+1),'.csv'], Gs, 'precision', '%.20f');
+dlmwrite('contact_line.csv', contact_line, 'precision', '%.5f');
+dlmwrite('thickness_index.csv', thickness_index, 'precision', '%.5f');
         
 %% Functions
 %----------------------------- Source term --------------------------------
@@ -137,45 +143,90 @@ function b = rhs_h(j, r, nPoints, precursor, J, dt, dr, gamma, h)
 end
 
 %---------------- Linear system for substratum nutrient -------------------
-function A = matrix_gs(jd, r, dr, dt, D, Qs, nPoints)
-    index1 = [ 1 ; 1 ; jd ; jd ; jd ; nPoints ; nPoints ];
-    index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nPoints-1 ; nPoints ];
-    entries = [ 1 + 2*dt*D/dr^2 + dt*D*Qs/2 ; -2*dt*D/dr^2 ; ... % ghost points for no-flux condition
-       -dt*D/(4*dr^2)*(r(jd+1) + r(jd))./r(jd) ; ones(nPoints-2, 1) + dt*D/(dr^2) + dt*D*Qs/2 ; -dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd) ; ... % interior grid points
-       -dt*D/(dr^2) ; 1 + dt*D/(dr^2) + dt*D*Qs/2 ]; % ghost points for no-flux condition
-    A = sparse(index1, index2, entries, nPoints, nPoints);
+function A = matrix_gs(jd, r, dr, dt, D, Qs, nR, h, threshold)
+    index1 = [ 1 ; 1 ; jd ; jd ; jd ; nR ; nR ];
+    index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nR-1 ; nR ];
+    entries = [ 1 + 2*dt*D/dr^2 + dt*D*Qs/2*(h(1) >= threshold) ; -2*dt*D/dr^2 ; ... % ghost points for no-flux condition
+       -dt*D/(4*dr^2)*(r(jd+1) + r(jd))./r(jd) ; ones(nR-2, 1) + dt*D/(dr^2) + dt*D*Qs/2*(h(jd) >= threshold) ; -dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd) ; ... % interior grid points
+       -dt*D/(dr^2) ; 1 + dt*D/(dr^2) + dt*D*Qs/2*(h(nR) >= threshold) ]; % ghost points for no-flux condition
+    A = sparse(index1, index2, entries, nR, nR);
 end
 
-function b = rhs_gs(jd, r, dr, dt, D, Qs, nPoints, gs, gb)
-    b = nan(nPoints,1);
-    b(1) = gs(1)*(1 - 2*dt*D/dr^2 - dt*D*Qs/2) + gs(2)*(2*dt*D/dr^2) + dt*D*Qs*gb(1); % ghost points for no-flux condition
-    b(jd) = gs(jd).*(1 - dt*D/(dr^2) - dt*D*Qs/2)...
+function b = rhs_gs(jd, r, dr, dt, D, Qs, nR, gs, gb, h, threshold)
+    b = nan(nR,1);
+    b(1) = gs(1)*(1 - 2*dt*D/dr^2 - dt*D*Qs/2*(h(1) >= threshold)) + gs(2)*(2*dt*D/dr^2) + dt*D*Qs*gb(1)*(h(1) >= threshold); % ghost points for no-flux condition
+    b(jd) = gs(jd).*(1 - dt*D/(dr^2) - dt*D*Qs/2*(h(jd) >= threshold))...
         + gs(jd+1).*(dt*D/(4*dr^2)*(r(jd+1) + r(jd))./r(jd))...
-        + gs(jd-1).*(dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd)) + dt*D*Qs*gb(jd); % interior grid points
-    b(nPoints) = gs(nPoints)*(1 - dt*D/(dr^2) - dt*D*Qs/2) + gs(nPoints-1)*(dt*D/(dr^2)) + dt*D*Qs*gb(nPoints); % ghost points for no-flux condition
+        + gs(jd-1).*(dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd)) + dt*D*Qs*gb(jd).*(h(jd) >= threshold); % interior grid points
+    b(nR) = gs(nR)*(1 - dt*D/(dr^2) - dt*D*Qs/2*(h(nR) >= threshold)) + gs(nR-1)*(dt*D/(dr^2)) + dt*D*Qs*gb(nR)*(h(nR) >= threshold); % ghost points for no-flux condition
 end
 
+% Fully regularised
 %------------------ Linear system for biofilm nutrient --------------------
-function A = matrix_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta)
+function A = matrix_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, threshold)
     % Construct linear system
-    index1 = [ 1 ; 1 ; jd ; jd ; jd ; nPoints ; nPoints ];
-    index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nPoints-1 ; nPoints ];
-    entries = [ Pe*h(1) + dt*gamma*(1-phi)*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) + 2*dt*h(1)/(dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(1)/2 ; -2*dt*h(1)/(dr^2) ; ... % ghost points for no-flux condition
-        dt*gamma*(1-phi)*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) ; Pe*h(jd) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(jd)/2 ; -dt*gamma*(1-phi)*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) ; ... % interior grid points
-        -dt*h(nPoints)/(dr^2) ; Pe*h(nPoints) + dt*gamma*(1-phi)*Pe*(3*theta(nPoints) - 4*theta(nPoints-1) + theta(nPoints-2))/(12*r(nPoints)*dr) + dt*h(nPoints)/dr^2 + dt*Qb/2 + dt*Upsilon*phi*h(nPoints)/2 ]; % ghost points for no-flux condition
-    A = sparse(index1, index2, entries, nPoints, nPoints);
+    index1 = [ 1 ; 1 ; jd ; jd ; jd ; nR ; nR ];
+    index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nR-1 ; nR ];
+    entries = [ 1*(h(1) < threshold) + (Pe*h(1) + dt*gamma*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) + 2*dt*h(1)/(dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(1)/2)*(h(1) >= threshold) ; -2*dt*h(1)/(dr^2)*(h(1) >= threshold) ; ... % ghost points for no-flux condition
+        (dt*gamma*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2)).*(h(jd) >= threshold) ; ...
+        ones(nR-2,1).*(h(jd) < threshold) + (Pe*h(jd) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(jd)/2).*(h(jd) >= threshold) ; ...
+        (-dt*gamma*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2)).*(h(jd) >= threshold) ; ... % interior grid points
+        -dt*h(nR)/(dr^2)*(h(nR) >= threshold) ; 1*(h(nR) < threshold) + (Pe*h(nR) + dt*gamma*Pe*(3*theta(nR) - 4*theta(nR-1) + theta(nR-2))/(12*r(nR)*dr) + dt*h(nR)/dr^2 + dt*Qb/2 + dt*Upsilon*phi*h(nR)/2)*(h(nR) >= threshold) ]; % ghost points for no-flux condition
+    A = sparse(index1, index2, entries, nR, nR);
 end
 
-function b = rhs_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs)
-    b = nan(nPoints,1);
-    b(1) = gb(1)*(Pe*h(1) - dt*gamma*(1-phi)*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) - 2*dt*h(1)/(dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(1)/2)...
-        + gb(2)*(2*dt*h(1)/(dr^2)) + dt*Qb*gs(1); % ghost points for no-flux condition
-    b(jd) = gb(jd).*(Pe*h(jd) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(jd)/2) ...
-        + gb(jd+1).*(-dt*gamma*(1-phi)*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2)) ...
-        + gb(jd-1).*( dt*gamma*(1-phi)*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2))...
-        + dt*Qb*gs(jd); % interior grid points
-    b(nPoints) = gb(nPoints)*(Pe*h(nPoints) - dt*gamma*(1-phi)*Pe*(3*theta(nPoints) - 4*theta(nPoints-1) + theta(nPoints-2))/(12*r(nPoints)*dr) - dt*h(nPoints)/dr^2 - dt*Qb/2 - dt*Upsilon*phi*h(nPoints)/2)...
-        + gb(nPoints-1)*(dt*h(nPoints)/(dr^2)) + dt*Qb*gs(nPoints); % ghost points for no-flux condition
+function b = rhs_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs, threshold)
+    b = nan(nR,1);
+    b(1) = gb(1)*(h(1) < threshold) + gb(1)*(Pe*h(1) - dt*gamma*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) - 2*dt*h(1)/(dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(1)/2)*(h(1) >= threshold)...
+        + gb(2)*(2*dt*h(1)/(dr^2))*(h(1) >= threshold) + dt*Qb*gs(1)*(h(1) >= threshold); % ghost points for no-flux condition
+    b(jd) = gb(jd).*(h(jd) < threshold)  + gb(jd).*(Pe*h(jd) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(jd)/2).*(h(jd) >= threshold) ...
+        + gb(jd+1).*(-dt*gamma*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2)).*(h(jd) >= threshold) ...
+        + gb(jd-1).*( dt*gamma*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2)).*(h(jd) >= threshold)...
+        + dt*Qb*gs(jd).*(h(jd) >= threshold); % interior grid points
+    b(nR) = gb(nR)*(h(nR) < threshold) + gb(nR)*(Pe*h(nR) - dt*gamma*Pe*(3*theta(nR) - 4*theta(nR-1) + theta(nR-2))/(12*r(nR)*dr) - dt*h(nR)/dr^2 - dt*Qb/2 - dt*Upsilon*phi*h(nR)/2)*(h(nR) >= threshold)...
+        + gb(nR-1)*(dt*h(nR)/(dr^2))*(h(nR) >= threshold) + dt*Qb*gs(nR)*(h(nR) >= threshold); % ghost points for no-flux condition
 end
+
+% %---------------- Linear system for substratum nutrient -------------------
+% function A = matrix_gs(jd, r, dr, dt, D, Qs, nPoints)
+%     index1 = [ 1 ; 1 ; jd ; jd ; jd ; nPoints ; nPoints ];
+%     index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nPoints-1 ; nPoints ];
+%     entries = [ 1 + 2*dt*D/dr^2 + dt*D*Qs/2 ; -2*dt*D/dr^2 ; ... % ghost points for no-flux condition
+%        -dt*D/(4*dr^2)*(r(jd+1) + r(jd))./r(jd) ; ones(nPoints-2, 1) + dt*D/(dr^2) + dt*D*Qs/2 ; -dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd) ; ... % interior grid points
+%        -dt*D/(dr^2) ; 1 + dt*D/(dr^2) + dt*D*Qs/2 ]; % ghost points for no-flux condition
+%     A = sparse(index1, index2, entries, nPoints, nPoints);
+% end
+% 
+% function b = rhs_gs(jd, r, dr, dt, D, Qs, nPoints, gs, gb)
+%     b = nan(nPoints,1);
+%     b(1) = gs(1)*(1 - 2*dt*D/dr^2 - dt*D*Qs/2) + gs(2)*(2*dt*D/dr^2) + dt*D*Qs*gb(1); % ghost points for no-flux condition
+%     b(jd) = gs(jd).*(1 - dt*D/(dr^2) - dt*D*Qs/2)...
+%         + gs(jd+1).*(dt*D/(4*dr^2)*(r(jd+1) + r(jd))./r(jd))...
+%         + gs(jd-1).*(dt*D/(4*dr^2)*(r(jd) + r(jd-1))./r(jd)) + dt*D*Qs*gb(jd); % interior grid points
+%     b(nPoints) = gs(nPoints)*(1 - dt*D/(dr^2) - dt*D*Qs/2) + gs(nPoints-1)*(dt*D/(dr^2)) + dt*D*Qs*gb(nPoints); % ghost points for no-flux condition
+% end
+% 
+% %------------------ Linear system for biofilm nutrient --------------------
+% function A = matrix_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta)
+%     % Construct linear system
+%     index1 = [ 1 ; 1 ; jd ; jd ; jd ; nPoints ; nPoints ];
+%     index2 = [ 1 ; 2 ; jd+1 ; jd ; jd-1 ; nPoints-1 ; nPoints ];
+%     entries = [ Pe*h(1) + dt*gamma*(1-phi)*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) + 2*dt*h(1)/(dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(1)/2 ; -2*dt*h(1)/(dr^2) ; ... % ghost points for no-flux condition
+%         dt*gamma*(1-phi)*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) ; Pe*h(jd) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) + dt*Qb/2 + dt*Upsilon*phi*h(jd)/2 ; -dt*gamma*(1-phi)*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) ; ... % interior grid points
+%         -dt*h(nPoints)/(dr^2) ; Pe*h(nPoints) + dt*gamma*(1-phi)*Pe*(3*theta(nPoints) - 4*theta(nPoints-1) + theta(nPoints-2))/(12*r(nPoints)*dr) + dt*h(nPoints)/dr^2 + dt*Qb/2 + dt*Upsilon*phi*h(nPoints)/2 ]; % ghost points for no-flux condition
+%     A = sparse(index1, index2, entries, nPoints, nPoints);
+% end
+% 
+% function b = rhs_gb(h, r, dr, nPoints, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs)
+%     b = nan(nPoints,1);
+%     b(1) = gb(1)*(Pe*h(1) - dt*gamma*(1-phi)*Pe*(-3*theta(1) + 4*theta(2) - theta(3))/(6*dr) - 2*dt*h(1)/(dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(1)/2)...
+%         + gb(2)*(2*dt*h(1)/(dr^2)) + dt*Qb*gs(1); % ghost points for no-flux condition
+%     b(jd) = gb(jd).*(Pe*h(jd) - dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2) - dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2) - dt*Qb/2 - dt*Upsilon*phi*h(jd)/2) ...
+%         + gb(jd+1).*(-dt*gamma*(1-phi)*Pe*(r(jd+1).*theta(jd+1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd+1)).*(h(jd) + h(jd+1))./(8*r(jd)*dr^2)) ...
+%         + gb(jd-1).*( dt*gamma*(1-phi)*Pe*(r(jd-1).*theta(jd-1))./(12*dr*r(jd)) + dt*(r(jd) + r(jd-1)).*(h(jd) + h(jd-1))./(8*r(jd)*dr^2))...
+%         + dt*Qb*gs(jd); % interior grid points
+%     b(nPoints) = gb(nPoints)*(Pe*h(nPoints) - dt*gamma*(1-phi)*Pe*(3*theta(nPoints) - 4*theta(nPoints-1) + theta(nPoints-2))/(12*r(nPoints)*dr) - dt*h(nPoints)/dr^2 - dt*Qb/2 - dt*Upsilon*phi*h(nPoints)/2)...
+%         + gb(nPoints-1)*(dt*h(nPoints)/(dr^2)) + dt*Qb*gs(nPoints); % ghost points for no-flux condition
+% end
 %--------------------------------------------------------------------------
 end

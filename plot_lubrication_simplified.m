@@ -4,11 +4,10 @@ function plot_lubrication_simplified
 %   Alex Tam, 18/03/2019.
 %--------------------------------------------------------------------------
 %--------------------------- Import global data ---------------------------
-r = importdata('r.csv');
-R_dim = importdata('dish_size.csv');
-t = importdata('t.csv');
-threshold = importdata('threshold.csv');
-times = 1:2000:20001;
+r = importdata('r.csv'); R_dim = importdata('dish_size.csv');
+t = importdata('t.csv'); contact_line = importdata('contact_line.csv');
+thickness_index = importdata('thickness_index.csv');
+times = 1:10000:100001;
 
 %------------------------- Plot solution profiles -------------------------
 for plots = 1:length(times)
@@ -32,8 +31,18 @@ for plots = 1:length(times)
     figure
 end
 
+%----------------------- Plot contact line position -----------------------
 format long
-fprintf('The final biofilm size is: %f.\n', r(find(h <= threshold, 1)))
+fprintf('The final biofilm size is: %f.\n', contact_line(end))
+hold on; set(gca, 'FontSize', 16) % change axis tick font size
+plot(t, contact_line, 'LineWidth', 1.5); xlim([0, t(end)]); ylim([0 r(end)]);
+xlabel('\(t\)', 'Interpreter', 'latex', 'FontSize', 16); ylabel('\(S(t)\)', 'Interpreter', 'latex', 'FontSize', 16); figure
+
+%-------------------------- Plot thickness index --------------------------
+format long
+hold on; set(gca, 'FontSize', 16) % change axis tick font size
+plot(t, thickness_index, 'LineWidth', 1.5); xlim([0, t(end)]); ylim([0 1]);
+xlabel('\(t\)', 'Interpreter', 'latex', 'FontSize', 16); ylabel('\(I_t\)', 'Interpreter', 'latex', 'FontSize', 16); figure
 
 %-------------------------- Plot surface tension --------------------------
 nPoints = length(r); dr = r(2) - r(1); 
