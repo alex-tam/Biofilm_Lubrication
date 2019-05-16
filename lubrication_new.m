@@ -10,7 +10,7 @@ H0 = 0.1; % [-] maximum initial biofilm height
 Psi_m = 1/9; % [-] ECM production rate
 Psi_d = 0; % [-] cell death rate
 precursor = 1e-4; % [-] precursor film height
-threshold = 1.1*precursor; % [-] source term threshold
+threshold = 0.002; %1.1*precursor; % [-] source term threshold
 
 %------------------------ Dimensional parameters --------------------------
 R_b = 2.875; % [mm] Initial biofilm size
