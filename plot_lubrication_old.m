@@ -10,8 +10,6 @@ R_dim = importdata('dish_size.csv');
 t = importdata('t.csv');
 R = importdata('R_mat.csv'); R = reshape(R, nR, nZ);
 Zeta = importdata('Zeta_mat.csv'); Zeta = reshape(Zeta, nR, nZ);
-contact_line = importdata('contact_line.csv');
-thickness_index = importdata('thickness_index.csv');
 times = 1:1000:10001;
 gamma = 10; threshold = 1.1e-4; Psi_m = 1/9; Psi_d = 0;
 
@@ -47,13 +45,17 @@ for plots = 1:length(times)
     view(0, 90); 
     print(gcf, '-depsc', ['u_z-',num2str(time_step),'.eps'])
     figure % (az, el)
-    surf(R, Z, Vol_Frac,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar
+    surf(R, Z, Vol_Frac,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; caxis([0 1])
     xlabel('\(r\)','FontSize',20,'Interpreter','latex')
     ylabel('\(z\)','FontSize',20,'Interpreter','latex')
     zlabel('\(\phi_n\)','Interpreter','latex','FontSize',20)
     view(0, 90) % (az, el)
     figure
 end
+
+min(min(Vol_Frac))
+contact_line = importdata('contact_line.csv');
+thickness_index = importdata('thickness_index.csv');
 
 %----------------------- Plot contact line position -----------------------
 format long
@@ -135,21 +137,23 @@ plot(r, theta_r); xlabel('\(r\)', 'Interpreter', 'latex'); ylabel('\(\Theta_r\)'
     % Compute advection coefficients
     a1 = -gamma*Zeta.*(Zeta/2 - ones(nR, nZ));
     a2 = Uz./h_mat - Zeta./h_mat.*dHdt + gamma*Zeta.^2.*(Zeta/2 - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
-    a3 = gb - Psi_d - dUdZ./h_mat - gamma*Zeta.*(Zeta - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
+    a3 = gb_mat - Psi_d - dUdZ./h_mat - gamma*Zeta.*(Zeta - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
     a1 = a1.*(h_mat >= threshold); a2 = a2.*(h_mat >= threshold); a3 = a3.*(h_mat >= threshold);
 
-    surf(R, Z, a1,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
+    surf(R, Zeta, a1,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
     xlabel('\(r\)','FontSize',20,'Interpreter','latex')
     ylabel('\(z\)','FontSize',20,'Interpreter','latex')
     zlabel('\(A_1\)','Interpreter','latex','FontSize',20); figure
-    surf(R, Z, a2,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
+    surf(R, Zeta, a2,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
     xlabel('\(r\)','FontSize',20,'Interpreter','latex')
     ylabel('\(z\)','FontSize',20,'Interpreter','latex')
     zlabel('\(A_2\)','Interpreter','latex','FontSize',20); figure
-    surf(R, Z, a3,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
+    surf(R, Zeta, a3,'EdgeColor','none','LineStyle','none','FaceLighting','phong'); colorbar; 
     xlabel('\(r\)','FontSize',20,'Interpreter','latex')
     ylabel('\(z\)','FontSize',20,'Interpreter','latex')
     zlabel('\(A_3\)','Interpreter','latex','FontSize',20); figure
+    
+    plot(R(:,nZ), a2(:,nZ)); figure
 
 %----------------------- Check boundary conditions ------------------------
 dr = r(2) - r(1); dz = Zeta(1,2) - Zeta(1,1); z = Zeta(1,:);

@@ -36,10 +36,10 @@ T = 14208*psi_n*G; % [-] dimensionless time in the experiment
 
 %------------------------- Numerical parameters ---------------------------
 nR = 201; j = (3:nR-2)'; jd = (2:nR-1)';
-nZ = 201;
+nZ = 101;
 nTimes = 10001;
 r = linspace(0, R_dim, nR)'; dr = r(2) - r(1);
-R = repmat(r, 1, nZ); 
+R = repmat(r, 1, nZ);
 Xi = R; jXi = (2:nR-1)';
 jZeta = (2:nZ-1)';
 Zeta = repmat(linspace(0, 1, nZ), nR, 1);
@@ -57,54 +57,68 @@ dlmwrite('Zeta_mat.csv', reshape(Zeta, nR*nZ,1));
 
 % Indices for the 2D advection equation
 Index = reshape(1:nR*nZ, nR, nZ); % Matrix of each index
-index_int = reshape(Index(jXi, jZeta), (nR-2)*(nZ-2), 1); % indices of interior grid points
-index_int_rp = reshape(Index(jXi+1, jZeta), (nR-2)*(nZ-2), 1); % indices of interior grid points
-index_int_rn = reshape(Index(jXi-1, jZeta), (nR-2)*(nZ-2), 1); % indices of interior grid points
-index_int_zp = reshape(Index(jXi, jZeta+1), (nR-2)*(nZ-2), 1); % indices of interior grid points
-index_int_zn = reshape(Index(jXi, jZeta-1), (nR-2)*(nZ-2), 1); % indices of interior grid points
-index_r_in = reshape(Index(1, 1:nZ), nZ, 1); % indices of points on r = 0
-index_r_in_p = reshape(Index(2, 1:nZ), nZ, 1); % indices of points on r = 0
-index_r_in_pp = reshape(Index(3, 1:nZ), nZ, 1); % indices of points on r = 0
-index_r_out = reshape(Index(nR, jZeta), nZ-2, 1); % indices of points on r = R
-index_r_out_rn = reshape(Index(nR-1, jZeta), nZ-2, 1); % indices of points on r = R
-index_r_out_rnn = reshape(Index(nR-2, jZeta), nZ-2, 1); % indices of points on r = R
-index_r_out_zp = reshape(Index(nR, jZeta+1), nZ-2, 1); % indices of points on r = R
-index_r_out_zn = reshape(Index(nR, jZeta-1), nZ-2, 1); % indices of points on r = R
-index_z_in = reshape(Index(2:nR, 1), nR-1, 1); % indices of points on z = 0
-index_z_in_p = reshape(Index(2:nR, 2), nR-1, 1); % indices of points on z = 0
-index_z_in_pp = reshape(Index(2:nR, 3), nR-1, 1); % indices of points on z = 0
-index_z_out = reshape(Index(jXi, nZ), nR-2, 1); % indices of points on z = h
-index_z_out_rp = reshape(Index(jXi+1, nZ), nR-2, 1); % indices of points on z = h
-index_z_out_rn = reshape(Index(jXi-1, nZ), nR-2, 1); % indices of points on z = h
-index_z_out_zn = reshape(Index(jXi, nZ-1), nR-2, 1); % indices of points on z = h
-index_z_out_znn = reshape(Index(jXi, nZ-2), nR-2, 1); % indices of points on z = h
-index_corner = Index(nR, nZ); % index of outer corner point
-index_corner_rn = Index(nR-1, nZ); % index of outer corner point
-index_corner_rnn = Index(nR-2, nZ); % index of outer corner point
-index_corner_zn = Index(nR, nZ-1); % index of outer corner point
-index_corner_znn = Index(nR, nZ-2); % index of outer corner point
+% Construct the seven regions
+rl_z = reshape(Index(1, 1:nZ), nZ, 1); % r = 0, z
+rl_z_rp = reshape(Index(2, 1:nZ), nZ, 1);
+rl_z_rpp = reshape(Index(3, 1:nZ), nZ, 1);
+ri_zi = reshape(Index(jXi, jZeta), (nR-2)*(nZ-2), 1); % interior r, interior z
+ri_zi_rp = reshape(Index(jXi+1, jZeta), (nR-2)*(nZ-2), 1);
+ri_zi_rn = reshape(Index(jXi-1, jZeta), (nR-2)*(nZ-2), 1);
+ri_zi_zp = reshape(Index(jXi, jZeta+1), (nR-2)*(nZ-2), 1);
+ri_zi_zn = reshape(Index(jXi, jZeta-1), (nR-2)*(nZ-2), 1);
+rr_zi = reshape(Index(nR, jZeta), nZ-2, 1); % r = R, interior z
+rr_zi_rn = reshape(Index(nR-1, jZeta), nZ-2, 1);
+rr_zi_rnn = reshape(Index(nR-2, jZeta), nZ-2, 1);
+rr_zi_zp = reshape(Index(nR, jZeta+1), nZ-2, 1);
+rr_zi_zn = reshape(Index(nR, jZeta-1), nZ-2, 1);
+ri_zb = reshape(Index(jXi, 1), nR-2, 1); % interior r, z = 0
+ri_zb_rp = reshape(Index(jXi-1, 1), nR-2, 1);
+ri_zb_rn = reshape(Index(jXi-1, 1), nR-2, 1);
+ri_zb_zp = reshape(Index(jXi, 2), nR-2, 1);
+ri_zb_zpp = reshape(Index(jXi, 3), nR-2, 1);
+ri_zt = reshape(Index(jXi, nZ), nR-2, 1); % interior r, z = h
+ri_zt_rp = reshape(Index(jXi+1, nZ), nR-2, 1);
+ri_zt_rn = reshape(Index(jXi-1, nZ), nR-2, 1);
+ri_zt_zn = reshape(Index(jXi, nZ-1), nR-2, 1);
+ri_zt_znn = reshape(Index(jXi, nZ-2), nR-2, 1);
+rr_zb = Index(nR, 1); % r = R, z = 0
+rr_zb_rn = Index(nR-1, 1);
+rr_zb_rnn = Index(nR-2, 1);
+rr_zb_zp = Index(nR, 2);
+rr_zb_zpp = Index(nR, 3);
+rr_zt = Index(nR, nZ); % r = R, z = h
+rr_zt_rn = Index(nR-1, nZ);
+rr_zt_rnn = Index(nR-2, nZ);
+rr_zt_zn = Index(nR, nZ-1);
+rr_zt_znn = Index(nR, nZ-2);
 
 % Indices of entries in the sparse matrix    
-Index2D_1 = [ index_r_in ; index_r_in ; index_r_in ; ...
-    index_z_in ; index_z_in ; index_z_in ; ...
-    index_int ; index_int ; index_int ; index_int ; index_int ; ...
-    index_r_out ; index_r_out ; index_r_out ; index_r_out ; index_r_out ; ...
-    index_z_out ; index_z_out ; index_z_out ; index_z_out ; index_z_out ; ...
-    index_corner ; index_corner ; index_corner ; index_corner ; index_corner ];
-Index2D_2 = [ index_r_in ; index_r_in_p ; index_r_in_pp ; ...
-    index_z_in ; index_z_in_p ; index_z_in_pp ; ...
-    index_int ; index_int_rp ; index_int_rn ; index_int_zp ; index_int_zn ; ...
-    index_r_out ; index_r_out_rn ; index_r_out_rnn ; index_r_out_zp ; index_r_out_zn ; ...
-    index_z_out ; index_z_out_rp ; index_z_out_rn ; index_z_out_zn ; index_z_out_znn ; ...
-    index_corner ; index_corner_rn ; index_corner_rnn ; index_corner_zn ; index_corner_znn ];
+Index2D_1 = [ rl_z ; rl_z ; rl_z ; ...
+    ri_zb ; ri_zb ; ri_zb ; ri_zb ; ri_zb ; ...
+    ri_zi ; ri_zi ; ri_zi ; ri_zi ; ri_zi ; ...
+    rr_zi ; rr_zi ; rr_zi ; rr_zi ; rr_zi ; ...
+    ri_zt ; ri_zt ; ri_zt ; ri_zt ; ri_zt ; ...
+    rr_zt ; rr_zt ; rr_zt ; rr_zt ; rr_zt ; ...
+    rr_zb ; rr_zb ; rr_zb ; rr_zb ; rr_zb ];
+Index2D_2 = [ rl_z ; rl_z_rp ; rl_z_rpp ; ...
+    ri_zb ; ri_zb_rp ; ri_zb_rn ; ri_zb_zp ; ri_zb_zpp ; ...
+    ri_zi ; ri_zi_rp ; ri_zi_rn ; ri_zi_zp ; ri_zi_zn ; ...
+    rr_zi ; rr_zi_rn ; rr_zi_rnn ; rr_zi_zp ; rr_zi_zn ; ...
+    ri_zt ; ri_zt_rp ; ri_zt_rn ; ri_zt_zn ; ri_zt_znn ; ...
+    rr_zt ; rr_zt_rn ; rr_zt_rnn ; rr_zt_zn ; rr_zt_znn ; ...
+    rr_zb ; rr_zb_rn ; rr_zb_rnn ; rr_zb_zp ; rr_zb_zpp ];
 
 %-------------------------- Initial conditons -----------------------------
-% H = precursor + (H0-precursor)*(ones(size(r)) - (r/1).^2).*(r <= 1);  % [-] initial biofilm height (parabolic)
-H = (precursor + (H0-precursor)*(1 - (r/1).^2).^4).*(r <= 1) + precursor*(r > 1); % [-] initial biofilm height (Ward/King)
+H = precursor + (H0-precursor)*(ones(size(r)) - (r/1).^2).*(r <= 1);  % [-] initial biofilm height (parabolic)
+% H = (precursor + (H0-precursor)*(1 - (r/1).^2).^4).*(r <= 1) + precursor*(r > 1); % [-] initial biofilm height (Ward/King)
 contact_line = r(find(H <= threshold, 1))*ones(nTimes,1); % [-] initial contact line position
 thickness_index = max(H)/contact_line(1)*ones(nTimes, 1); % [-] initial thickness index
 % c = 50; r0 = 0.9; Vol_Frac = ((exp(-c*r0) + 2*exp(-c*R))./(exp(-c*r0) + exp(-c*R)) - 1).*(R <= 1); % [-] Sigmoidal initial condition
-Vol_Frac = (1*ones(nR, nZ) - 3*R.^2 + 2*R.^3).*(R <=1); % [-] smooth step function
+% Vol_Frac = (1*ones(nR, nZ) - 3*R.^2 + 2*R.^3).*(R <=1); % [-] smooth step function
+Vol_Frac = (3*Zeta.^2 - 2*Zeta.^3).*(1*ones(nR, nZ) - 3*R.^2 + 2*R.^3).*(R <=1); % [-] smooth step function
+% Z = Zeta.*repmat(H, 1, nZ);
+% dist = sqrt(R.^2 + (H0*ones(nR,nZ) - Z).^2);
+% Vol_Frac = (1*ones(nR, nZ) - 3*dist.^2 + 2*dist.^3).*(R <=1); % [-] smooth step function
 volume_fraction = reshape(Vol_Frac, nR*nZ, 1);
 Gs = ones(nR, 1); % [-] initial substratum nutrient concentration within the biofilm
 Gb = zeros(nR, 1); % [-] initial biofilm nutrient concentration
@@ -118,7 +132,7 @@ end
 Bar_Phi = Total_Phi./H;
 
 % Solve for velocity
-Surface_Tension = surf_tens(H, r, dr, nR);
+Surface_Tension = surf_tens(H, r, dr, nR, threshold);
 
 H_mat = repmat(H, 1, nZ);
 Integral_uz = nan(nR,nZ);
@@ -176,10 +190,11 @@ for i = 1:nTimes-1
     % Compute advection coefficients
     a1 = -gamma*Zeta.*(Zeta/2 - ones(nR, nZ));
     a2 = uz./h_mat - Zeta./h_mat.*dHdt + gamma*Zeta.^2.*(Zeta/2 - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
-    a3 = Gb - Psi_d - dUdZ./h_mat - gamma*Zeta.*(Zeta - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
+    a3 = gb_mat - Psi_d - dUdZ./h_mat - gamma*Zeta.*(Zeta - ones(nR, nZ)).*h_mat.*theta_mat.*dHdX;
+%     a2 = 0.1*Zeta.^2; % artificial
     a1 = a1.*(h_mat >= threshold); a2 = a2.*(h_mat >= threshold); a3 = a3.*(h_mat >= threshold);
     % Solve for volume fraction (Crank--Nicolson)  
-    A = lhs_phi(nR, nZ, Index2D_1, Index2D_2, dxi, dzeta, dt, Xi, theta_mat, h_mat, a1, a2, a3, index_r_in, index_z_in, index_int, index_int_rp, index_int_rn, index_r_out, index_r_out_rn, index_r_out_rnn, index_z_out, index_z_out_rp, index_z_out_rn, index_corner, index_corner_rn, index_corner_rnn);
+    A = lhs_phi(nR, nZ, Index2D_1, Index2D_2, dxi, dzeta, dt, Xi, theta_mat, h_mat, a1, a2, a3, rl_z, ri_zb, ri_zb_rp, ri_zb_rn, ri_zi, ri_zi_rp, ri_zi_rn, rr_zi, rr_zi_rn, rr_zi_rnn, ri_zt, ri_zt_rp, ri_zt_rn, rr_zt, rr_zt_rn, rr_zt_rnn, rr_zb, rr_zb_rn, rr_zb_rnn);
     b = rhs_phi(nR, nZ, jXi, jZeta, dxi, dzeta, dt, Xi, theta_mat, h_mat, volume_fraction, a1, a2, a3);
     [precL, precU] = ilu(A);
     volume_fraction = gmres(A, b, 10, 1e-6, 10, precL, precU, volume_fraction);
@@ -206,7 +221,7 @@ for i = 1:nTimes-1
     Bar_Phi = Total_Phi./H;
     % 6. Vertical velocity
     H_mat = repmat(H, 1, nZ);
-    Surface_Tension = surf_tens(H, r, dr, nR);
+    Surface_Tension = surf_tens(H, r, dr, nR, threshold);
 %     Integral_uzeta = nan(nR,nZ);
 %     for row = 1:nR
 %         Integral_uzeta(row, :) = cumtrapz(Zeta(row,:), H(row)*Vol_Frac(row,:));
@@ -253,7 +268,8 @@ dlmwrite('thickness_index.csv', thickness_index, 'precision', '%.5f');
 %% Functions
 
 %--------------------------- Surface tension ------------------------------
-function theta = surf_tens(H, r, dr, nR)
+function theta = surf_tens(H, r, dr, nR, threshold)
+%     % Second-order sequential
 %     H_r = [ (-3*H(1) + 4*H(2) - H(3))/(2*dr) ; (H(3:nR) - H(1:nR-2))/(2*dr) ; (3*H(nR) - 4*H(nR-1) + H(nR-2))/(2*dr) ];
 %     H_rr = [ (-3*H_r(1) + 4*H_r(2) - H_r(3))/(2*dr) ; (H_r(3:nR) - H_r(1:nR-2))/(2*dr) ; (3*H_r(nR) - 4*H_r(nR-1) + H_r(nR-2))/(2*dr) ];
 %     H_rrr = [ (-3*H_rr(1) + 4*H_rr(2) - H_rr(3))/(2*dr) ; (H_rr(3:nR) - H_rr(1:nR-2))/(2*dr) ; (3*H_rr(nR) - 4*H_rr(nR-1) + H_rr(nR-2))/(2*dr) ];
@@ -268,6 +284,72 @@ function theta = surf_tens(H, r, dr, nR)
     theta(nR-1) = (r(nR)*(3*H(nR) - 4*H(nR-1) + H(nR-2)) - r(nR-1)*(H(nR) - H(nR-2)))/(dr^3*(r(nR) + r(nR-1)))...
         + (r(nR-2)*(H(nR-1) - H(nR-3)) - r(nR-1)*(H(nR) - H(nR-2)))/(dr^3*(r(nR-1) + r(nR-2)));
     theta(nR) = 0;
+    theta = smooth(r, theta);
+    theta = theta.*(H >= threshold);
+%     % Conservative form, avoid discontinuity
+%     nB = find(H < threshold, 1) - 1;
+%     theta = zeros(nR,1);
+%     theta(1) = 0;
+%     theta(2) = (r(3)*(H(4) - H(2)) - r(2)*(H(3) - H(1)))/(dr^3*(r(3)+r(2))) - r(2)*(H(3) - H(1))/(r(2)*dr^3);
+%     theta(3:nB-2) = ((r(5:nB) + r(4:nB-1)).*(H(5:nB) - H(4:nB-1)) - (r(4:nB-1) + r(3:nB-2)).*(H(4:nB-1) - H(3:nB-2)))./(4*r(4:nB-1)*dr^3) ...
+%        - ((r(3:nB-2) + r(2:nB-3)).*(H(3:nB-2) - H(2:nB-3)) - (r(2:nB-3) + r(1:nB-4)).*(H(2:nB-3) - H(1:nB-4)))./(4*r(2:nB-3)*dr^3);
+%     theta(nB-1) = (r(nB)*(3*H(nB) - 4*H(nB-1) + H(nB-2)) - r(nB-1)*(H(nB) - H(nB-2)))/(dr^3*(r(nB) + r(nB-1)))...
+%        + (r(nB-2)*(H(nB-1) - H(nB-3)) - r(nB-1)*(H(nB) - H(nB-2)))/(dr^3*(r(nB-1) + r(nB-2)));
+%     theta(nB) = 3/r(nB)*(9*r(nB)*H(nB) - 12*r(nB)*H(nB-1) + 3*r(nB)*H(nB-2) - 4*(r(nB) + r(nB-1))*(H(nB) - H(nB-1)) + r(nB-1)*(H(nB) - H(nB-2)))/(2*dr^3) ...
+%         - 2/(r(nB) + r(nB-1))*(3*r(nB)*H(nB) - 4*r(nB)*H(nB) + r(nB)*H(nB-2) - r(nB-1)*(H(nB) - H(nB-2)))/(2*dr^3) ...
+%         + 1/(r(nB-1))*((r(nB) + r(nB-1))*(H(nB) - H(nB-1)) + (r(nB-1) + r(nB-2))*(H(nB-1) - H(nB-2)))/(2*dr^3);
+%     theta = theta.*(H >= threshold);
+%     % Sixth-order sequential
+%     H_r = [(-147*H(1) + 360*H(2) - 450*H(3) + 400*H(4) - 225*H(5) + 72*H(6) - 10*H(7))/(60*dr) ; ...
+%           (-10*H(1) - 77*H(2) + 150*H(3) - 100*H(4) + 50*H(5) - 15*H(6) + 2*H(7))/(60*dr) ; ...
+%           (2*H(1) - 24*H(2) - 35*H(3) + 80*H(4) - 30*H(5) + 8*H(6) - H(7))/(60*dr) ; ...
+%           (-H(1:nR-6) + 9*H(2:nR-5) - 45*H(3:nR-4) + 45*H(5:nR-2) - 9*H(6:nR-1) + H(7:nR))/(60*dr) ; ...
+%           (-2*H(nR) + 24*H(nR-1) + 35*H(nR-2) - 80*H(nR-3) + 30*H(nR-4) - 8*H(nR-5) + H(nR-6))/(60*dr) ; ...
+%           (10*H(nR) + 77*H(nR-1) - 150*H(nR-2) + 100*H(nR-3) - 50*H(nR-4) + 15*H(nR-5) - 2*H(nR-6))/(60*dr) ; ...
+%           (147*H(nR) - 360*H(nR-1) + 450*H(nR-2) - 400*H(nR-3) + 225*H(nR-4) - 72*H(nR-5) + 10*H(nR-6))/(60*dr)];
+%     H_rr = [(-147*H_r(1) + 360*H_r(2) - 450*H_r(3) + 400*H_r(4) - 225*H_r(5) + 72*H_r(6) - 10*H_r(7))/(60*dr) ; ...
+%           (-10*H_r(1) - 77*H_r(2) + 150*H_r(3) - 100*H_r(4) + 50*H_r(5) - 15*H_r(6) + 2*H_r(7))/(60*dr) ; ...
+%           (2*H_r(1) - 24*H_r(2) - 35*H_r(3) + 80*H_r(4) - 30*H_r(5) + 8*H_r(6) - H_r(7))/(60*dr) ; ...
+%           (-H_r(1:nR-6) + 9*H_r(2:nR-5) - 45*H_r(3:nR-4) + 45*H_r(5:nR-2) - 9*H_r(6:nR-1) + H_r(7:nR))/(60*dr) ; ...
+%           (-2*H_r(nR) + 24*H_r(nR-1) + 35*H_r(nR-2) - 80*H_r(nR-3) + 30*H_r(nR-4) - 8*H_r(nR-5) + H_r(nR-6))/(60*dr) ; ...
+%           (10*H_r(nR) + 77*H_r(nR-1) - 150*H_r(nR-2) + 100*H_r(nR-3) - 50*H_r(nR-4) + 15*H_r(nR-5) - 2*H_r(nR-6))/(60*dr) ; ...
+%           (147*H_r(nR) - 360*H_r(nR-1) + 450*H_r(nR-2) - 400*H_r(nR-3) + 225*H_r(nR-4) - 72*H_r(nR-5) + 10*H_r(nR-6))/(60*dr)];
+%     H_rrr = [(-147*H_rr(1) + 360*H_rr(2) - 450*H_rr(3) + 400*H_rr(4) - 225*H_rr(5) + 72*H_rr(6) - 10*H_rr(7))/(60*dr) ; ...
+%           (-10*H_rr(1) - 77*H_rr(2) + 150*H_rr(3) - 100*H_rr(4) + 50*H_rr(5) - 15*H_rr(6) + 2*H_rr(7))/(60*dr) ; ...
+%           (2*H_rr(1) - 24*H_rr(2) - 35*H_rr(3) + 80*H_rr(4) - 30*H_rr(5) + 8*H_rr(6) - H_rr(7))/(60*dr) ; ...
+%           (-H_rr(1:nR-6) + 9*H_rr(2:nR-5) - 45*H_rr(3:nR-4) + 45*H_rr(5:nR-2) - 9*H_rr(6:nR-1) + H_rr(7:nR))/(60*dr) ; ...
+%           (-2*H_rr(nR) + 24*H_rr(nR-1) + 35*H_rr(nR-2) - 80*H_rr(nR-3) + 30*H_rr(nR-4) - 8*H_rr(nR-5) + H_rr(nR-6))/(60*dr) ; ...
+%           (10*H_rr(nR) + 77*H_rr(nR-1) - 150*H_rr(nR-2) + 100*H_rr(nR-3) - 50*H_rr(nR-4) + 15*H_rr(nR-5) - 2*H_rr(nR-6))/(60*dr) ; ...
+%           (147*H_rr(nR) - 360*H_rr(nR-1) + 450*H_rr(nR-2) - 400*H_rr(nR-3) + 225*H_rr(nR-4) - 72*H_rr(nR-5) + 10*H_rr(nR-6))/(60*dr)];
+%     theta = H_rrr + H_rr./r - H_r./(r.^2);
+%     theta(1) = 0;
+%     theta = theta.*(H >= threshold);
+%     % Sixth-order sequential, avoid discontinuity
+%     theta = zeros(nR,1);
+%     nB = find(H < threshold, 1) - 1;
+%     H_r = [(-147*H(1) + 360*H(2) - 450*H(3) + 400*H(4) - 225*H(5) + 72*H(6) - 10*H(7))/(60*dr) ; ...
+%           (-10*H(1) - 77*H(2) + 150*H(3) - 100*H(4) + 50*H(5) - 15*H(6) + 2*H(7))/(60*dr) ; ...
+%           (2*H(1) - 24*H(2) - 35*H(3) + 80*H(4) - 30*H(5) + 8*H(6) - H(7))/(60*dr) ; ...
+%           (-H(1:nB-6) + 9*H(2:nB-5) - 45*H(3:nB-4) + 45*H(5:nB-2) - 9*H(6:nB-1) + H(7:nB))/(60*dr) ; ...
+%           (-2*H(nB) + 24*H(nB-1) + 35*H(nB-2) - 80*H(nB-3) + 30*H(nB-4) - 8*H(nB-5) + H(nB-6))/(60*dr) ; ...
+%           (10*H(nB) + 77*H(nB-1) - 150*H(nB-2) + 100*H(nB-3) - 50*H(nB-4) + 15*H(nB-5) - 2*H(nB-6))/(60*dr) ; ...
+%           (147*H(nB) - 360*H(nB-1) + 450*H(nB-2) - 400*H(nB-3) + 225*H(nB-4) - 72*H(nB-5) + 10*H(nB-6))/(60*dr)];
+%     H_rr = [(-147*H_r(1) + 360*H_r(2) - 450*H_r(3) + 400*H_r(4) - 225*H_r(5) + 72*H_r(6) - 10*H_r(7))/(60*dr) ; ...
+%           (-10*H_r(1) - 77*H_r(2) + 150*H_r(3) - 100*H_r(4) + 50*H_r(5) - 15*H_r(6) + 2*H_r(7))/(60*dr) ; ...
+%           (2*H_r(1) - 24*H_r(2) - 35*H_r(3) + 80*H_r(4) - 30*H_r(5) + 8*H_r(6) - H_r(7))/(60*dr) ; ...
+%           (-H_r(1:nB-6) + 9*H_r(2:nB-5) - 45*H_r(3:nB-4) + 45*H_r(5:nB-2) - 9*H_r(6:nB-1) + H_r(7:nB))/(60*dr) ; ...
+%           (-2*H_r(nB) + 24*H_r(nB-1) + 35*H_r(nB-2) - 80*H_r(nB-3) + 30*H_r(nB-4) - 8*H_r(nB-5) + H_r(nB-6))/(60*dr) ; ...
+%           (10*H_r(nB) + 77*H_r(nB-1) - 150*H_r(nB-2) + 100*H_r(nB-3) - 50*H_r(nB-4) + 15*H_r(nB-5) - 2*H_r(nB-6))/(60*dr) ; ...
+%           (147*H_r(nB) - 360*H_r(nB-1) + 450*H_r(nB-2) - 400*H_r(nB-3) + 225*H_r(nB-4) - 72*H_r(nB-5) + 10*H_r(nB-6))/(60*dr)];
+%     H_rrr = [(-147*H_rr(1) + 360*H_rr(2) - 450*H_rr(3) + 400*H_rr(4) - 225*H_rr(5) + 72*H_rr(6) - 10*H_rr(7))/(60*dr) ; ...
+%           (-10*H_rr(1) - 77*H_rr(2) + 150*H_rr(3) - 100*H_rr(4) + 50*H_rr(5) - 15*H_rr(6) + 2*H_rr(7))/(60*dr) ; ...
+%           (2*H_rr(1) - 24*H_rr(2) - 35*H_rr(3) + 80*H_rr(4) - 30*H_rr(5) + 8*H_rr(6) - H_rr(7))/(60*dr) ; ...
+%           (-H_rr(1:nB-6) + 9*H_rr(2:nB-5) - 45*H_rr(3:nB-4) + 45*H_rr(5:nB-2) - 9*H_rr(6:nB-1) + H_rr(7:nB))/(60*dr) ; ...
+%           (-2*H_rr(nB) + 24*H_rr(nB-1) + 35*H_rr(nB-2) - 80*H_rr(nB-3) + 30*H_rr(nB-4) - 8*H_rr(nB-5) + H_rr(nB-6))/(60*dr) ; ...
+%           (10*H_rr(nB) + 77*H_rr(nB-1) - 150*H_rr(nB-2) + 100*H_rr(nB-3) - 50*H_rr(nB-4) + 15*H_rr(nB-5) - 2*H_rr(nB-6))/(60*dr) ; ...
+%           (147*H_rr(nB) - 360*H_rr(nB-1) + 450*H_rr(nB-2) - 400*H_rr(nB-3) + 225*H_rr(nB-4) - 72*H_rr(nB-5) + 10*H_rr(nB-6))/(60*dr)];
+%     theta(1:nB) = H_rrr + H_rr./r(1:nB) - H_r./(r(1:nB).^2);
+%     theta(1) = 0;
 end
 
 %----------------------------- Source term --------------------------------
@@ -330,17 +412,18 @@ function b = rhs_h(j, r, nR, precursor, J, dt, dr, gamma, h)
 end
 
 %--------------- Linear system for cell volume fraction -------------------
-function A = lhs_phi(nR, nZ, Index2D_1, Index2D_2, dxi, dzeta, dt, Xi, theta_mat, h_mat, a1, a2, a3, index_r_in, index_z_in, index_int, index_int_rp, index_int_rn, index_r_out, index_r_out_rn, index_r_out_rnn, index_z_out, index_z_out_rp, index_z_out_rn, index_corner, index_corner_rn, index_corner_rnn)
+function A = lhs_phi(nR, nZ, Index2D_1, Index2D_2, dxi, dzeta, dt, Xi, theta_mat, h_mat, a1, a2, a3, rl_z, ri_zb, ri_zb_rp, ri_zb_rn, ri_zi, ri_zi_rp, ri_zi_rn, rr_zi, rr_zi_rn, rr_zi_rnn, ri_zt, ri_zt_rp, ri_zt_rn, rr_zt, rr_zt_rn, rr_zt_rnn, rr_zb, rr_zb_rn, rr_zb_rnn)
     % reshape
     a1_vec = reshape(a1, nR*nZ, 1); a2_vec = reshape(a2, nR*nZ, 1); a3_vec = reshape(a3, nR*nZ, 1);
     xi_vec = reshape(Xi, nR*nZ, 1); theta_vec = reshape(theta_mat, nR*nZ, 1); h_vec = reshape(h_mat, nR*nZ,1);
     % Matrix entries
-    Entries2D = [ -3/(2*dxi)*ones(size(index_r_in)) ; 4/(2*dxi)*ones(size(index_r_in)) ; -1/(2*dxi)*ones(size(index_r_in)) ; ...
-        -3/(2*dzeta)*ones(size(index_z_in)) ; 4/(2*dzeta)*ones(size(index_z_in)) ; -1/(2*dzeta)*ones(size(index_z_in)) ; ...
-        1 - dt/2*a3_vec(index_int) ; dt/(4*dxi)*a1_vec(index_int)./xi_vec(index_int).*xi_vec(index_int_rp).*h_vec(index_int_rp).^2.*theta_vec(index_int_rp) ; -dt/(4*dxi)*a1_vec(index_int)./xi_vec(index_int).*xi_vec(index_int_rn).*h_vec(index_int_rn).^2.*theta_vec(index_int_rn) ; dt/(4*dzeta)*a2_vec(index_int) ; -dt/(4*dzeta)*a2_vec(index_int) ; ...
-        1 - dt/2*a3_vec(index_r_out) + 3*dt/(4*dxi)*a1_vec(index_r_out)./xi_vec(index_r_out).*xi_vec(index_r_out).*h_vec(index_r_out).^2.*theta_vec(index_r_out) ; -4*dt/(4*dxi)*a1_vec(index_r_out)./xi_vec(index_r_out).*xi_vec(index_r_out_rn).*h_vec(index_r_out_rn).^2.*theta_vec(index_r_out_rn) ; dt/(4*dxi)*a1_vec(index_r_out)./xi_vec(index_r_out).*xi_vec(index_r_out_rnn).*h_vec(index_r_out_rnn).^2.*theta_vec(index_r_out_rnn) ; dt/(4*dzeta)*a2_vec(index_r_out) ; -dt/(4*dzeta)*a2_vec(index_r_out) ; ...
-        1 - dt/2*a3_vec(index_z_out) + 3*dt/(4*dzeta)*a2_vec(index_z_out) ; dt/(4*dxi)*a1_vec(index_z_out)./xi_vec(index_z_out).*xi_vec(index_z_out_rp).*h_vec(index_z_out_rp).^2.*theta_vec(index_z_out_rp) ; -dt/(4*dxi)*a1_vec(index_z_out)./xi_vec(index_z_out).*xi_vec(index_z_out_rn).*h_vec(index_z_out_rn).^2.*theta_vec(index_z_out_rn) ; -4*dt/(4*dzeta)*a2_vec(index_z_out) ; dt/(4*dzeta)*a2_vec(index_z_out) ; ...
-        1 - dt/2*a3_vec(index_corner) + 3*dt/(4*dxi)*a1_vec(index_corner)./xi_vec(index_corner).*xi_vec(index_corner).*h_vec(index_corner).^2.*theta_vec(index_corner) + 3*dt/(4*dzeta)*a2_vec(index_corner) ; -4*dt/(4*dxi)*a1_vec(index_corner)./xi_vec(index_corner).*xi_vec(index_corner_rn).*h_vec(index_corner_rn).^2.*theta_vec(index_corner_rn) ; dt/(4*dxi)*a1_vec(index_corner)./xi_vec(index_corner).*xi_vec(index_corner_rnn).*h_vec(index_corner_rnn).^2.*theta_vec(index_corner_rnn) ; -4*dt/(4*dzeta)*a2_vec(index_corner) ; dt/(4*dzeta)*a2_vec(index_corner) ];
+    Entries2D = [ -3/(2*dxi)*ones(size(rl_z)) ; 4/(2*dxi)*ones(size(rl_z)) ; -1/(2*dxi)*ones(size(rl_z)) ; ...
+        1 - dt/2*a3_vec(ri_zb) - 3*dt/(4*dzeta)*a2_vec(ri_zb) ; dt/(4*dxi)*a1_vec(ri_zb)./xi_vec(ri_zb).*xi_vec(ri_zb_rp).*h_vec(ri_zb_rp).^2.*theta_vec(ri_zb_rp) ; -dt/(4*dxi)*a1_vec(ri_zb)./xi_vec(ri_zb).*xi_vec(ri_zb_rn).*h_vec(ri_zb_rn).^2.*theta_vec(ri_zb_rn) ; 4*dt/(4*dzeta)*a2_vec(ri_zb) ; -dt/(4*dzeta)*a2_vec(ri_zb) ; ...
+        1 - dt/2*a3_vec(ri_zi) ; dt/(4*dxi)*a1_vec(ri_zi)./xi_vec(ri_zi).*xi_vec(ri_zi_rp).*h_vec(ri_zi_rp).^2.*theta_vec(ri_zi_rp) ; -dt/(4*dxi)*a1_vec(ri_zi)./xi_vec(ri_zi).*xi_vec(ri_zi_rn).*h_vec(ri_zi_rn).^2.*theta_vec(ri_zi_rn) ; dt/(4*dzeta)*a2_vec(ri_zi) ; -dt/(4*dzeta)*a2_vec(ri_zi) ; ...
+        1 - dt/2*a3_vec(rr_zi) + 3*dt/(4*dxi)*a1_vec(rr_zi)./xi_vec(rr_zi).*xi_vec(rr_zi).*h_vec(rr_zi).^2.*theta_vec(rr_zi) ; -4*dt/(4*dxi)*a1_vec(rr_zi)./xi_vec(rr_zi).*xi_vec(rr_zi_rn).*h_vec(rr_zi_rn).^2.*theta_vec(rr_zi_rn) ; dt/(4*dxi)*a1_vec(rr_zi)./xi_vec(rr_zi).*xi_vec(rr_zi_rnn).*h_vec(rr_zi_rnn).^2.*theta_vec(rr_zi_rnn) ; dt/(4*dzeta)*a2_vec(rr_zi) ; -dt/(4*dzeta)*a2_vec(rr_zi) ; ...
+        1 - dt/2*a3_vec(ri_zt) + 3*dt/(4*dzeta)*a2_vec(ri_zt) ; dt/(4*dxi)*a1_vec(ri_zt)./xi_vec(ri_zt).*xi_vec(ri_zt_rp).*h_vec(ri_zt_rp).^2.*theta_vec(ri_zt_rp) ; -dt/(4*dxi)*a1_vec(ri_zt)./xi_vec(ri_zt).*xi_vec(ri_zt_rn).*h_vec(ri_zt_rn).^2.*theta_vec(ri_zt_rn) ; -4*dt/(4*dzeta)*a2_vec(ri_zt) ; dt/(4*dzeta)*a2_vec(ri_zt) ; ...
+        1 - dt/2*a3_vec(rr_zt) + 3*dt/(4*dxi)*a1_vec(rr_zt)./xi_vec(rr_zt).*xi_vec(rr_zt).*h_vec(rr_zt).^2.*theta_vec(rr_zt) + 3*dt/(4*dzeta)*a2_vec(rr_zt) ; -4*dt/(4*dxi)*a1_vec(rr_zt)./xi_vec(rr_zt).*xi_vec(rr_zt_rn).*h_vec(rr_zt_rn).^2.*theta_vec(rr_zt_rn) ; dt/(4*dxi)*a1_vec(rr_zt)./xi_vec(rr_zt).*xi_vec(rr_zt_rnn).*h_vec(rr_zt_rnn).^2.*theta_vec(rr_zt_rnn) ; -4*dt/(4*dzeta)*a2_vec(rr_zt) ; dt/(4*dzeta)*a2_vec(rr_zt) ; ...
+        1 - dt/2*a3_vec(rr_zb) + 3*dt/(4*dxi)*a1_vec(rr_zb)./xi_vec(rr_zb).*xi_vec(rr_zb).*h_vec(rr_zb).^2.*theta_vec(rr_zb) - 3*dt/(4*dzeta)*a2_vec(rr_zb) ; -4*dt/(4*dxi)*a1_vec(rr_zb)./xi_vec(rr_zb).*xi_vec(rr_zb_rn).*h_vec(rr_zb_rn).^2.*theta_vec(rr_zb_rn) ; dt/(4*dxi)*a1_vec(rr_zb)./xi_vec(rr_zb).*xi_vec(rr_zb_rnn).*h_vec(rr_zb_rnn).^2.*theta_vec(rr_zb_rnn) ; 4*dt/(4*dzeta)*a2_vec(rr_zb) ; -dt/(4*dzeta)*a2_vec(rr_zb) ];
     A = sparse(Index2D_1, Index2D_2, Entries2D, nR*nZ, nR*nZ);
 %     % Construct indices for non-corner points
 %     A = sparse(nR*nZ, nR*nZ);
@@ -386,13 +469,12 @@ function b = rhs_phi(nR, nZ, jXi, jZeta, dxi, dzeta, dt, Xi, theta_mat, h_mat, v
     dPdR(jXi,:) = (Xi(jXi+1,:).*theta_mat(jXi+1,:).*h_mat(jXi+1,:).^2.*Phi(jXi+1,:) - Xi(jXi-1,:).*theta_mat(jXi-1,:).*h_mat(jXi-1,:).^2.*Phi(jXi-1,:))./(2*dxi*Xi(jXi,:));
     dPdR(nR,:) = (3*Xi(nR,:).*theta_mat(nR,:).*h_mat(nR,:).^2.*Phi(nR,:) - 4*Xi(nR-1,:).*theta_mat(nR-1,:).*h_mat(nR-1,:).^2.*Phi(nR-1,:) + Xi(nR-2,:).*theta_mat(nR-2,:).*h_mat(nR-2,:).^2.*Phi(nR-2,:))./(2*dxi*Xi(nR,:));
     % Compute dP/dZ
-    dPdZ(:,1) = zeros(nR,1);
+    dPdZ(:,1) = (-3*Phi(:,1) + 4*Phi(:,2) - Phi(:,3))/(2*dzeta);
     dPdZ(:,jZeta) = (Phi(:,jZeta+1) - Phi(:,jZeta-1))/(2*dzeta);
     dPdZ(:,nZ) = (3*Phi(:,nZ) - 4*Phi(:,nZ-1) + Phi(:,nZ-2))/(2*dzeta);
     % Construct Ax matrix vector product
     B = Phi - dt/2*a1.*dPdR - dt/2*a2.*dPdZ + dt/2*a3.*Phi; % Crank--Nicolson
-    B(1,:) = 0; % replace term with explicit BC
-    B(2:nR,1) = 0; % replace term with explicit BC
+    B(1,:) = 0; % replace term with explicit BC at r = 0
     b = reshape(B, nR*nZ, 1);
 end
 

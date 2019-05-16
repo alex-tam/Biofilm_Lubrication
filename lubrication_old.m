@@ -344,7 +344,7 @@ function Ax = lhs(nR, nZ, jXi, jZeta, dxi, dzeta, dt, Xi, theta_mat, h_mat, volu
 %     dPdR(nb,:) = (3*Xi(nb,:).*theta_mat(nb,:).*h_mat(nb,:).^2.*Phi(nb,:) - 4*Xi(nb-1,:).*theta_mat(nb-1,:).*h_mat(nb-1,:).^2.*Phi(nb-1,:) + Xi(nb-2,:).*theta_mat(nb-2,:).*h_mat(nb-2,:).^2.*Phi(nb-2,:))./(2*dxi*Xi(nb,:));
 %     dPdR(nb+1:nR, :) = 0;
     % Compute dP/dZ
-    dPdZ(:,1) = zeros(nR,1);
+    dPdZ(:,1) = (-3*Phi(:,1) + 4*Phi(:,2) - Phi(:,3))/(2*dzeta);
     dPdZ(:,jZeta) = (Phi(:,jZeta+1) - Phi(:,jZeta-1))/(2*dzeta);
     dPdZ(:,nZ) = (3*Phi(:,nZ) - 4*Phi(:,nZ-1) + Phi(:,nZ-2))/(2*dzeta);
     % Construct Ax matrix vector product
@@ -367,14 +367,14 @@ function b = rhs(nR, nZ, jXi, jZeta, dxi, dzeta, dt, Xi, theta_mat, h_mat, volum
 %     dPdR(nb,:) = (3*Xi(nb,:).*theta_mat(nb,:).*h_mat(nb,:).^2.*Phi(nb,:) - 4*Xi(nb-1,:).*theta_mat(nb-1,:).*h_mat(nb-1,:).^2.*Phi(nb-1,:) + Xi(nb-2,:).*theta_mat(nb-2,:).*h_mat(nb-2,:).^2.*Phi(nb-2,:))./(2*dxi*Xi(nb,:));
 %     dPdR(nb+1:nR, :) = 0;
     % Compute dP/dZ
-    dPdZ(:,1) = zeros(nR,1);
+    dPdZ(:,1) = (-3*Phi(:,1) + 4*Phi(:,2) - Phi(:,3))/(2*dzeta);
     dPdZ(:,jZeta) = (Phi(:,jZeta+1) - Phi(:,jZeta-1))/(2*dzeta);
     dPdZ(:,nZ) = (3*Phi(:,nZ) - 4*Phi(:,nZ-1) + Phi(:,nZ-2))/(2*dzeta);
     % Construct Ax matrix vector product
     B = Phi - dt/2*a1.*dPdR - dt/2*a2.*dPdZ + dt/2*a3.*Phi; % Crank--Nicolson
 %     B = Phi; % fully implicit
     B(1,2:nZ) = 0; % replace term with explicit BC
-    B(:,1) = 0; % replace term with explicit BC
+%     B(:,1) = 0; % replace term with explicit BC
     b = reshape(B, nR*nZ, 1);
 end
 

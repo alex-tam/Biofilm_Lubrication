@@ -4,3 +4,5 @@ function lubrication
 %   Solves the lubrication model for biofilm expansion.
 %   Alex Tam, 24/04/2019.
 %--------------------------------------------------------------------------
+
+end
