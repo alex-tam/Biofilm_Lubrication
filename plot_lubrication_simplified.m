@@ -5,8 +5,8 @@ function plot_lubrication_simplified
 %--------------------------------------------------------------------------
 %--------------------------- Import global data ---------------------------
 r = importdata('r.csv'); R_dim = importdata('dish_size.csv');
-t = importdata('t.csv'); contact_line = importdata('contact_line.csv');
-thickness_index = importdata('thickness_index.csv');
+t = importdata('t_constant_vf.csv'); contact_line = importdata('contact_line.csv');
+thickness_index = importdata('It_lubrication_constant_vf.csv');
 times = 1:10000:100001;
 
 %------------------------- Plot solution profiles -------------------------
@@ -27,7 +27,7 @@ for plots = 1:length(times)
     ylabel('Numerical solution', 'Interpreter', 'latex')
     title(['t = ', num2str(t(times(plots))),'.'], 'Interpreter', 'latex')
     xlim([0, R_dim]); ylim([0 2]);
-    print(gcf, '-depsc', ['radial_ext_sol-',num2str(time_step),'.eps'])
+    print(gcf, '-depsc', ['lubrication_simplified_sol-',num2str(time_step),'.eps'])
     figure
 end
 

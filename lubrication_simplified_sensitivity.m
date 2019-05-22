@@ -1,4 +1,4 @@
-function lubrication_simplified
+function lubrication_simplified_sensitivity
 %--------------------------------------------------------------------------
 % LUBRICATION_SIMPLIFIED Solve the simplified lubrication model.
 %   Solves the lubrication model for biofilm expansion, assuming constant
@@ -30,7 +30,7 @@ Qb = Q*R_b/(epsilon*D_b); % [-] biofilm permeability
 D = D_s/(psi_n*G*R_b^2); % [-] nutrient diffusion coefficient
 Pe = (psi_n*G*R_b^2)/D_b; % [-] Peclet number
 gamma = 1; % [-] surface tension coefficient
-T = 14208*psi_n*G; % [-] dimensionless time in the experiment
+T = 7200*psi_n*G; % [-] dimensionless time in the experiment
 
 %------------------------- Numerical parameters ---------------------------
 nR = 1001; j = (3:nR-2)'; jd = (2:nR-1)';
@@ -42,50 +42,73 @@ dlmwrite('r.csv', r, 'precision', 20);
 dlmwrite('dish_size.csv', R, 'precision', 20);
 dlmwrite('t_constant_vf.csv', t, 'precision', 20);
 
+%---------------------------- Vary parameters -----------------------------
+VAR = [ 1 ; 5 ]';
+dlmwrite('var.csv', VAR);
+
+% Pre-allocate test-dependent quantities
+final_size = nan(size(VAR));
+ridge = nan(size(VAR));
+thickness = nan(size(VAR));
+
+for tests = 1:length(VAR)
+    var = VAR(tests);
+    Qs = var;
+
 %-------------------------- Initial conditons -----------------------------
-H = precursor + (H0-precursor)*(ones(size(r)) - (r/1).^2).^4.*(r <= 1); % initial condition
-Gs = ones(nR, 1); % [-] initial substratum nutrient concentration within the biofilm
-Gb = 0*ones(nR, 1); % [-] initial biofilm nutrient concentration
-contact_line = r(find(H <= h_star, 1))*ones(nTimes,1); % [-] initial contact line position
-thickness_index = max(H)/contact_line(1)*ones(nTimes, 1); % [-] initial thickness index
-ridge_index = max(H)/H(1)*ones(nTimes, 1); % [-] initial ridge index
+    H = precursor + (H0-precursor)*(ones(size(r)) - (r/1).^2).^4.*(r <= 1); % initial condition
+    Gs = ones(nR, 1); % [-] initial substratum nutrient concentration within the biofilm
+    Gb = 0*ones(nR, 1); % [-] initial biofilm nutrient concentration
+    contact_line = r(find(H <= h_star, 1))*ones(nTimes,1); % [-] initial contact line position
+    thickness_index = max(H)/contact_line(1)*ones(nTimes, 1); % [-] initial thickness index
+    ridge_index = max(H)/H(1)*ones(nTimes, 1); % [-] initial ridge index
 
 %------------------------------ Solve PDEs --------------------------------
-for i = 1:nTimes-1
-    % Store variables
-    h = H; gs = Gs; gb = Gb; J = source(gb, h, h_star);
-    % Write data
-    if sum(i == 1:(nTimes-1)/output_files:nTimes) == 1
-        dlmwrite(['biofilm_height-',num2str(i),'.csv'], H, 'precision', '%.20f');
-        dlmwrite(['biofilm_nutrient-',num2str(i),'.csv'], Gb, 'precision', '%.20f');
-        dlmwrite(['substratum_nutrient-',num2str(i),'.csv'], Gs, 'precision', '%.20f');
-        dlmwrite(['source-',num2str(i),'.csv'], J, 'precision', '%.20f');
+    for i = 1:nTimes-1
+        % Store variables
+        h = H; gs = Gs; gb = Gb; J = source(gb, h, h_star);
+        % Write data
+        if sum(i == 1:(nTimes-1)/output_files:nTimes) == 1
+            dlmwrite(['biofilm_height-',num2str(i),'-var-',num2str(var),'.csv'], H, 'precision', '%.20f');
+            dlmwrite(['biofilm_nutrient-',num2str(i),'-var-',num2str(var),'.csv'], Gb, 'precision', '%.20f');
+            dlmwrite(['substratum_nutrient-',num2str(i),'-var-',num2str(var),'.csv'], Gs, 'precision', '%.20f');
+            dlmwrite(['source-',num2str(i),'-var-',num2str(var),'.csv'], J, 'precision', '%.20f');
+        end
+        % 1. Biofilm height
+        Ah = matrix_h(j, r, nR, dt, dr, gamma, h); bh = rhs_h(j, r, nR, precursor, J, dt, dr, gamma, h);
+        H = Ah\bh;
+        % 2. Nutrient concentration (substratum)
+        Ags = matrix_gs(jd, r, dr, dt, D, Qs, nR, h, h_star); bgs = rhs_gs(jd, r, dr, dt, D, Qs, nR, gs, gb, h, h_star);
+        Gs = Ags\bgs;
+        % Compute surface tension term
+        theta = h.^3.*surface_tension(h, r, dr, nR, h_star);
+        % 3. Nutrient concentration (biofilm)
+        Agb = matrix_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, h_star); bgb = rhs_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs, h_star);
+        Gb = Agb\bgb;
+        % Store contact line position
+        contact_line(i+1) = r(find(H <= h_star, 1)); % [-] contact line position
+        thickness_index(i+1) = max(H)/contact_line(i+1); % [-] thickness index
+        ridge_index(i+1) = max(H)/H(1); % [-] ridge index
     end
-    % 1. Biofilm height
-    Ah = matrix_h(j, r, nR, dt, dr, gamma, h); bh = rhs_h(j, r, nR, precursor, J, dt, dr, gamma, h);
-    H = Ah\bh;
-    % 2. Nutrient concentration (substratum)
-    Ags = matrix_gs(jd, r, dr, dt, D, Qs, nR, h, h_star); bgs = rhs_gs(jd, r, dr, dt, D, Qs, nR, gs, gb, h, h_star);
-    Gs = Ags\bgs;
-    % Compute surface tension term
-    theta = h.^3.*surface_tension(h, r, dr, nR, h_star);
-    % 3. Nutrient concentration (biofilm)
-    Agb = matrix_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, h_star); bgb = rhs_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, phi, jd, dt, theta, gb, gs, h_star);
-    Gb = Agb\bgb;
-    % Store contact line position
-    contact_line(i+1) = r(find(H <= h_star, 1)); % [-] contact line position
-    thickness_index(i+1) = max(H)/contact_line(i+1); % [-] thickness index
-    ridge_index(i+1) = max(H)/H(1); % [-] ridge index
+
+    dlmwrite(['biofilm_height-',num2str(i+1),'-var-',num2str(var),'.csv'], H, 'precision', '%.20f');
+    dlmwrite(['biofilm_nutrient-',num2str(i+1),'-var-',num2str(var),'.csv'], Gb, 'precision', '%.20f');
+    dlmwrite(['substratum_nutrient-',num2str(i+1),'-var-',num2str(var),'.csv'], Gs, 'precision', '%.20f');
+    dlmwrite(['source-',num2str(i+1),'-var-',num2str(var),'.csv'], source(Gb, H, h_star), 'precision', '%.20f');
+    dlmwrite(['contact_line','-var-',num2str(var),'.csv'], contact_line, 'precision', '%.5f');
+    dlmwrite(['It_lubrication_constant_vf','-var-',num2str(var),'.csv'], thickness_index, 'precision', '%.5f');
+    dlmwrite(['Ir_lubrication_constant_vf','-var-',num2str(var),'.csv'], ridge_index, 'precision', '%.5f');
+
+    % Store test-dependent quantities
+    final_size(tests) = contact_line(i+1);
+    ridge(tests) = ridge_index(i+1);
+    thickness(tests) = thickness_index(i+1);
 end
 
-dlmwrite(['biofilm_height-',num2str(i+1),'.csv'], H, 'precision', '%.20f');
-dlmwrite(['biofilm_nutrient-',num2str(i+1),'.csv'], Gb, 'precision', '%.20f');
-dlmwrite(['substratum_nutrient-',num2str(i+1),'.csv'], Gs, 'precision', '%.20f');
-dlmwrite(['source-',num2str(i+1),'.csv'], source(Gb, H, h_star), 'precision', '%.20f');
-dlmwrite('contact_line.csv', contact_line, 'precision', '%.5f');
-dlmwrite('It_lubrication_constant_vf.csv', thickness_index, 'precision', '%.5f');
-dlmwrite('Ir_lubrication_constant_vf.csv', ridge_index, 'precision', '%.5f');
-        
+dlmwrite('final_size.csv', final_size)
+dlmwrite('ridge.csv', ridge);
+dlmwrite('thickness.csv', thickness);
+
 %% Functions
 %--------------------------- Surface tension ------------------------------
 function theta = surface_tension(h, r, dr, nR, h_star)

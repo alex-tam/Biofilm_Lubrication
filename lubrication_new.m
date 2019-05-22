@@ -296,7 +296,7 @@ function theta = surf_tens(H, r, dr, nR, threshold)
 %     theta(nB-1) = (r(nB)*(3*H(nB) - 4*H(nB-1) + H(nB-2)) - r(nB-1)*(H(nB) - H(nB-2)))/(dr^3*(r(nB) + r(nB-1)))...
 %        + (r(nB-2)*(H(nB-1) - H(nB-3)) - r(nB-1)*(H(nB) - H(nB-2)))/(dr^3*(r(nB-1) + r(nB-2)));
 %     theta(nB) = 3/r(nB)*(9*r(nB)*H(nB) - 12*r(nB)*H(nB-1) + 3*r(nB)*H(nB-2) - 4*(r(nB) + r(nB-1))*(H(nB) - H(nB-1)) + r(nB-1)*(H(nB) - H(nB-2)))/(2*dr^3) ...
-%         - 2/(r(nB) + r(nB-1))*(3*r(nB)*H(nB) - 4*r(nB)*H(nB) + r(nB)*H(nB-2) - r(nB-1)*(H(nB) - H(nB-2)))/(2*dr^3) ...
+%         - 2/(r(nB) + r(nB-1))*(3*r(nB)*H(nB) - 4*r(nB)*H(nB-1) + r(nB)*H(nB-2) - r(nB-1)*(H(nB) - H(nB-2)))/(2*dr^3) ...
 %         + 1/(r(nB-1))*((r(nB) + r(nB-1))*(H(nB) - H(nB-1)) + (r(nB-1) + r(nB-2))*(H(nB-1) - H(nB-2)))/(2*dr^3);
 %     theta = theta.*(H >= threshold);
 %     % Sixth-order sequential
@@ -497,7 +497,7 @@ function b = rhs_gs(jd, r, dr, dt, D, Qs, nR, gs, gb, h, threshold)
     b(nR) = gs(nR)*(1 - dt*D/(dr^2) - dt*D*Qs/2*(h(nR) >= threshold)) + gs(nR-1)*(dt*D/(dr^2)) + dt*D*Qs*gb(nR)*(h(nR) >= threshold); % ghost points for no-flux condition
 end
 
-% Fully regularised
+% Fully regularised. This should be changed!
 %------------------ Linear system for biofilm nutrient --------------------
 function A = matrix_gb(h, r, dr, nR, gamma, Pe, Qb, Upsilon, bar_phi, jd, dt, theta, threshold)
     % Construct linear system
